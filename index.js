@@ -1,21 +1,18 @@
 var Keen = require('keen.io');
 var wifi = require('wifi-cc3000');
-var keenConfigure = require('./assets/js/keenConfigure.js');
-// var wifiSettings = {ssid: 'Hack Reactor', password:'awesomebullets'};
-var wifiNetwork = 'Hack Reactor';
-var wifiPassword = 'awesomebullets';
+var climatelib = require('climate-si7020');
+var ambientlib = require('ambient-attx4');
+var keenConfigure = require('./keenConfigure.js');
+var wifiSettings = require('./wifiConfigure.js');
+
+var wifiNetwork = wifiSettings.ssid;
+var wifiPassword = wifiSettings.password;
 var wifiTimeoutTime = 0; //in seconds
 var wifiSecurity  = 'wpa2';
-
 var wifiTimeouts = 0;
 
 var keen = Keen.configure(keenConfigure);
-// src colony modules tls.js
- 
 var tessel = require('tessel');
-
-var climatelib = require('climate-si7020');
-var ambientlib = require('ambient-attx4');
  
 var climate = climatelib.use(tessel.port.A);
 var ambient = ambientlib.use(tessel.port.D);
@@ -26,7 +23,6 @@ var lightTriggerLevel = 0.5;
 
 var led1 = tessel.led[0].output(0);
 var led2 = tessel.led[1].output(0); //led2 is on when wifi is on
-
  
 //------------------------------------------------
 // Climate Temp and Humidity
@@ -61,62 +57,15 @@ climate.on('ready', function () {
         });
       });
     }, THLSinterval*1000); //THLS interval is in seconds
-    // ambient.setLightTrigger(0.5);
-
-//     ambient.setLightTrigger(lightTriggerLevel);
-
-//     // Set a light level trigger
-//     // The trigger is a float between 0 and 1
-//     ambient.on('light-trigger', function(data) {
-//       console.log("Our light trigger was hit:", data);
-//       if (wifi.isConnected()) {
-//         sendLightTrigger(data);
-//       } else {
-//         console.log("wifi is not connected");
-//       }
-//       // Clear the trigger so it stops firing
-//       ambient.clearLightTrigger();
-//       //After 1.5 seconds reset light trigger
-//       setTimeout(function () {
-
-//           ambient.setLightTrigger(lightTriggerLevel);
-
-//       },1500);
-//     });
-
-//     // Set a sound level trigger
-//     // The trigger is a float between 0 and 1
-//     // ambient.setSoundTrigger(0.1);
-//     ambient.setSoundTrigger(soundTriggerLevel);
-
-//     ambient.on('sound-trigger', function(data) {
-//       console.log("Something happened with sound: ", data);
-//       if (wifi.isConnected()) {
-//         sendSoundTrigger(data);
-
-//       } else {
-//         console.log("wifi is not connected");
-//       }
-//       // Clear it
-//       ambient.clearSoundTrigger();
-
-//       //After 1.5 seconds reset sound trigger
-//       setTimeout(function () {
-
-//           ambient.setSoundTrigger(0.1);
-
-//       },1500);
-
-//     });
   });
 });
  
 climate.on('error', function(err) {
-  console.log('error connecting module', err);
+  console.log('climate module error', err);
 });
 
 ambient.on('error', function (err) {
-  console.log(err);
+  console.log('ambient module error',err);
 });
 
 function sendToCloud(tdata, hdata, ldata, sdata, cb){
@@ -131,45 +80,28 @@ function sendToCloud(tdata, hdata, ldata, sdata, cb){
   });
 }
 
-// function sendLightTrigger(data){
-//   keen.addEvent("climate", {
-//    "light-trigger": data
-//   }, function(){
-//     console.log("added Light event");
-//   });
-// }
-
-// function sendSoundTrigger(data){
-//   keen.addEvent("climate", {
-//    "sound-trigger": data
-//   }, function(){
-//     console.log("added Sound event");
-//   });
-// }
-
 //------------------------------------------------
 //  Wifi logic 
 //------------------------------------------------
 
 wifi.on('connect', function(data){
-  // you're connected
-  console.log("wifi connect emitted", data);
+  console.log("wifi connected:", data);
   led2 = tessel.led[1].output(1);
 });
 
 wifi.on('disconnect', function(data){
   // wifi dropped, probably want to call connect() again
-  console.log("wifi disconnect emitted", data);
+  console.log("wifi disconnected:", data);
   led2 = tessel.led[1].output(0);
   wifiConnect();
 });
 
 wifi.on('timeout', function(err){
-  // tried to connect but couldn't, retry
   console.log("wifi timeout (tried to connect but couldn't) emitted");
   wifiTimeouts++;
   if (wifiTimeouts > 2) {
     // reset the wifi chip if we've timed out too many times
+    console.log('2 wifi timeouts have occured, running a wifi power cycle');
     wifiPowerCycle();
   } else {
     // try to reconnect
@@ -209,9 +141,9 @@ function connectCallback(data) {
 function wifiConnect(){
   console.log('running wifiConnect');
   wifi.connect({
-  // security: wifiSecurity, 
-  ssid: wifiNetwork
-  , password: wifiPassword
+  security: wifiSecurity, 
+  ssid: wifiNetwork,
+  password: wifiPassword
   // , timeout: wifiTimeoutTime// in seconds
   }, connectCallback );
 }
